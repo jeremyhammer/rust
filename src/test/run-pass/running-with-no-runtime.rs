@@ -11,16 +11,12 @@
 #![feature(start)]
 
 use std::ffi;
-use std::old_io::process::{Command, ProcessOutput};
-use std::os;
+use std::process::{Command, Output};
 use std::rt::unwind::try;
-use std::rt;
 use std::str;
-use std::thread::Thread;
-use std::thunk::Thunk;
 
 #[start]
-fn start(argc: int, argv: *const *const u8) -> int {
+fn start(argc: isize, argv: *const *const u8) -> isize {
     if argc > 1 {
         unsafe {
             match **argv.offset(1) {
@@ -35,31 +31,26 @@ fn start(argc: int, argv: *const *const u8) -> int {
         return 0
     }
 
-    let args = unsafe {
-        (0..argc as uint).map(|i| {
-            let ptr = *argv.offset(i as int) as *const _;
-            ffi::c_str_to_bytes(&ptr).to_vec()
-        }).collect::<Vec<_>>()
+    let me = unsafe {
+        str::from_utf8(ffi::CStr::from_ptr(*argv as *const i8).to_bytes()).unwrap()
     };
-    let me = &*args[0];
-
-    let x: &[u8] = &[1];
+    let x = &"\x01";
     pass(Command::new(me).arg(x).output().unwrap());
-    let x: &[u8] = &[2];
+    let x = &"\x02";
     pass(Command::new(me).arg(x).output().unwrap());
-    let x: &[u8] = &[3];
+    let x = &"\x03";
     pass(Command::new(me).arg(x).output().unwrap());
-    let x: &[u8] = &[4];
+    let x = &"\x04";
     pass(Command::new(me).arg(x).output().unwrap());
-    let x: &[u8] = &[5];
+    let x = &"\x05";
     pass(Command::new(me).arg(x).output().unwrap());
 
     0
 }
 
-fn pass(output: ProcessOutput) {
+fn pass(output: Output) {
     if !output.status.success() {
-        println!("{:?}", str::from_utf8(&output.output));
-        println!("{:?}", str::from_utf8(&output.error));
+        println!("{:?}", str::from_utf8(&output.stdout));
+        println!("{:?}", str::from_utf8(&output.stderr));
     }
 }

@@ -21,13 +21,13 @@
 // FIXME: this should not be here.
 #![allow(missing_docs)]
 
-#![allow(dead_code)]
-
-use marker::Send;
-use ops::FnOnce;
+use env;
+use mem;
+use prelude::v1::*;
+use rt;
 use sys;
 use thunk::Thunk;
-use usize;
+use sys_common::thread_info;
 
 // Reexport some of our utilities which are expected by other crates.
 pub use self::util::{default_sched_threads, min_stack, running_on_valgrind};
@@ -55,61 +55,29 @@ mod libunwind;
 /// of exiting cleanly.
 pub const DEFAULT_ERROR_CODE: int = 101;
 
-#[cfg(any(windows, android))]
-const OS_DEFAULT_STACK_ESTIMATE: uint = 1 << 20;
-#[cfg(all(unix, not(android)))]
-const OS_DEFAULT_STACK_ESTIMATE: uint = 2 * (1 << 20);
+/// Ignore SIGPIPE signals.
+#[cfg(unix)]
+unsafe fn ignore_sigpipe() {
+    use libc;
+    use libc::funcs::posix01::signal::signal;
+    assert!(signal(libc::SIGPIPE, libc::SIG_IGN) != -1);
+}
+#[cfg(windows)]
+unsafe fn ignore_sigpipe() {}
 
 #[cfg(not(test))]
 #[lang = "start"]
 fn lang_start(main: *const u8, argc: int, argv: *const *const u8) -> int {
-    use prelude::v1::*;
-
-    use mem;
-    use env;
-    use rt;
-    use sys_common::thread_info::{self, NewThread};
-    use sys_common;
-    use thread::Thread;
-
-    let something_around_the_top_of_the_stack = 1;
-    let addr = &something_around_the_top_of_the_stack as *const int;
-    let my_stack_top = addr as uint;
-
-    // FIXME #11359 we just assume that this thread has a stack of a
-    // certain size, and estimate that there's at most 20KB of stack
-    // frames above our current position.
-    const TWENTY_KB: uint = 20000;
-
-    // saturating-add to sidestep overflow
-    let top_plus_spill = if usize::MAX - TWENTY_KB < my_stack_top {
-        usize::MAX
-    } else {
-        my_stack_top + TWENTY_KB
+    // First and foremost we setup the stack. Usually this involves noting stack extents and
+    // setting up overflow handlers.
+    let _stack = unsafe {
+        sys::stack::setup(true)
     };
-    // saturating-sub to sidestep underflow
-    let my_stack_bottom = if top_plus_spill < OS_DEFAULT_STACK_ESTIMATE {
-        0
-    } else {
-        top_plus_spill - OS_DEFAULT_STACK_ESTIMATE
-    };
-
-    let failed = unsafe {
-        // First, make sure we don't trigger any __morestack overflow checks,
-        // and next set up our stack to have a guard page and run through our
-        // own fault handlers if we hit it.
-        sys_common::stack::record_os_managed_stack_bounds(my_stack_bottom,
-                                                          my_stack_top);
-        sys::thread::guard::init();
-        sys::stack_overflow::init();
-
-        // Next, set up the current Thread with the guard information we just
-        // created. Note that this isn't necessary in general for new threads,
-        // but we just do this to name the main thread and to give it correct
-        // info about the stack bounds.
-        let thread: Thread = NewThread::new(Some("<main>".to_string()));
-        thread_info::set(sys::thread::guard::main(), thread);
-
+    // Next, we store some thread specific information along with a nice name for the thread.
+    thread_info::set(thread_info::NewThread::new(Some("<main>".to_string())));
+    let exit_code = unsafe {
+        // Store our args if necessary in a squirreled away location
+        args::init(argc, argv);
         // By default, some platforms will send a *signal* when a EPIPE error
         // would otherwise be delivered. This runtime doesn't install a SIGPIPE
         // handler, causing it to kill the program, which isn't exactly what we
@@ -117,34 +85,15 @@ fn lang_start(main: *const u8, argc: int, argv: *const *const u8) -> int {
         //
         // Hence, we set SIGPIPE to ignore when the program starts up in order
         // to prevent this problem.
-        #[cfg(windows)] fn ignore_sigpipe() {}
-        #[cfg(unix)] fn ignore_sigpipe() {
-            use libc;
-            use libc::funcs::posix01::signal::signal;
-            unsafe {
-                assert!(signal(libc::SIGPIPE, libc::SIG_IGN) != -1);
-            }
-        }
         ignore_sigpipe();
-
-        // Store our args if necessary in a squirreled away location
-        args::init(argc, argv);
-
-        // And finally, let's run some code!
-        let res = unwind::try(|| {
-            let main: fn() = mem::transmute(main);
-            main();
-        });
-        cleanup();
-        res.is_err()
+        // And, finally, run the user code.
+        match unwind::try(||{ mem::transmute::<*const u8, fn()>(main)(); }) {
+            Ok(_) => env::get_exit_status() as isize,
+            Err(_) => rt::DEFAULT_ERROR_CODE
+        }
     };
-
-    // If the exit code wasn't set, then the try block must have panicked.
-    if failed {
-        rt::DEFAULT_ERROR_CODE
-    } else {
-        env::get_exit_status() as isize
-    }
+    unsafe { cleanup(); }
+    exit_code
 }
 
 /// Enqueues a procedure to run when the runtime is cleaned up
@@ -175,7 +124,6 @@ pub fn at_exit<F:FnOnce()+Send+'static>(f: F) {
 /// undefined behavior.
 pub unsafe fn cleanup() {
     args::cleanup();
-    sys::stack_overflow::cleanup();
     // FIXME: (#20012): the resources being cleaned up by at_exit
     // currently are not prepared for cleanup to happen asynchronously
     // with detached threads using the resources; for now, we leak.

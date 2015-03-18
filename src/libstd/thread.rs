@@ -154,7 +154,7 @@ use thunk::Thunk;
 use time::Duration;
 
 use sys::thread as imp;
-use sys_common::{stack, thread_info};
+use sys_common::thread_info;
 
 /// Thread configuration. Provides detailed control over the properties
 /// and behavior of new threads.
@@ -268,25 +268,13 @@ impl Builder {
         let my_packet = Packet(Arc::new(UnsafeCell::new(None)));
         let their_packet = Packet(my_packet.0.clone());
 
-        // Spawning a new OS thread guarantees that __morestack will never get
-        // triggered, but we must manually set up the actual stack bounds once
-        // this function starts executing. This raises the lower limit by a bit
-        // because by the time that this function is executing we've already
-        // consumed at least a little bit of stack (we don't know the exact byte
-        // address at which our stack started).
         let main = move || {
-            let something_around_the_top_of_the_stack = 1;
-            let addr = &something_around_the_top_of_the_stack as *const i32;
-            let my_stack_top = addr as usize;
-            let my_stack_bottom = my_stack_top - stack_size + 1024;
-            unsafe {
-                if let Some(name) = their_thread.name() {
+            if let Some(name) = their_thread.name() {
+                unsafe {
                     imp::set_name(name);
                 }
-                stack::record_os_managed_stack_bounds(my_stack_bottom,
-                                                      my_stack_top);
-                thread_info::set(imp::guard::current(), their_thread);
             }
+            thread_info::set(their_thread);
 
             let mut output = None;
             let try_result = {
@@ -363,7 +351,11 @@ pub fn scoped<'a, T, F>(f: F) -> JoinGuard<'a, T> where
 /// Gets a handle to the thread that invokes it.
 #[stable(feature = "rust1", since = "1.0.0")]
 pub fn current() -> Thread {
-    thread_info::current_thread()
+    thread_info::current_thread().unwrap_or_else(||{
+        let newthread = Thread::new(None);
+        thread_info::set(newthread.clone());
+        newthread
+    })
 }
 
 /// Cooperatively give up a timeslice to the OS scheduler.
@@ -482,7 +474,7 @@ impl Thread {
     #[deprecated(since = "1.0.0", reason = "use module-level free function")]
     #[stable(feature = "rust1", since = "1.0.0")]
     pub fn current() -> Thread {
-        thread_info::current_thread()
+        current()
     }
 
     /// Deprecated: use module-level free function.

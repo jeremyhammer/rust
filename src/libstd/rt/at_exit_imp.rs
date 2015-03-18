@@ -7,7 +7,6 @@
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
-
 //! Implementation of running at_exit routines
 //!
 //! Documentation can be found on the `rt::at_exit` function.
@@ -43,6 +42,7 @@ unsafe fn init() {
     // ::libc::atexit(cleanup);
 }
 
+#[allow(dead_code)] // Not used because bugs
 pub fn cleanup() {
     unsafe {
         LOCK.lock();

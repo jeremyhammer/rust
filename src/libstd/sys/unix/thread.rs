@@ -8,14 +8,11 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![allow(dead_code)]
-
 use core::prelude::*;
 
 use cmp;
 use ffi::CString;
 use io;
-use libc::consts::os::posix01::PTHREAD_STACK_MIN;
 use libc;
 use mem;
 use ptr;
@@ -23,165 +20,10 @@ use sys::os;
 use thunk::Thunk;
 use time::Duration;
 
-use sys_common::stack::RED_ZONE;
+use sys::stack;
 use sys_common::thread::*;
 
 pub type rust_thread = libc::pthread_t;
-
-#[cfg(all(not(target_os = "linux"),
-          not(target_os = "macos"),
-          not(target_os = "bitrig"),
-          not(target_os = "openbsd")))]
-pub mod guard {
-    pub unsafe fn current() -> usize { 0 }
-    pub unsafe fn main() -> usize { 0 }
-    pub unsafe fn init() {}
-}
-
-
-#[cfg(any(target_os = "linux",
-          target_os = "macos",
-          target_os = "bitrig",
-          target_os = "openbsd"))]
-#[allow(unused_imports)]
-pub mod guard {
-    use libc::{self, pthread_t};
-    use libc::funcs::posix88::mman::mmap;
-    use libc::consts::os::posix88::{PROT_NONE,
-                                    MAP_PRIVATE,
-                                    MAP_ANON,
-                                    MAP_FAILED,
-                                    MAP_FIXED};
-    use mem;
-    use ptr;
-    use super::{pthread_self, pthread_attr_destroy};
-    use sys::os;
-
-    // These are initialized in init() and only read from after
-    static mut GUARD_PAGE: usize = 0;
-
-    #[cfg(any(target_os = "macos",
-              target_os = "bitrig",
-              target_os = "openbsd"))]
-    unsafe fn get_stack_start() -> *mut libc::c_void {
-        current() as *mut libc::c_void
-    }
-
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    unsafe fn get_stack_start() -> *mut libc::c_void {
-        let mut attr: libc::pthread_attr_t = mem::zeroed();
-        assert_eq!(pthread_getattr_np(pthread_self(), &mut attr), 0);
-        let mut stackaddr = ptr::null_mut();
-        let mut stacksize = 0;
-        assert_eq!(pthread_attr_getstack(&attr, &mut stackaddr, &mut stacksize), 0);
-        assert_eq!(pthread_attr_destroy(&mut attr), 0);
-        stackaddr
-    }
-
-    pub unsafe fn init() {
-        let psize = os::page_size();
-        let mut stackaddr = get_stack_start();
-
-        // Ensure stackaddr is page aligned! A parent process might
-        // have reset RLIMIT_STACK to be non-page aligned. The
-        // pthread_attr_getstack() reports the usable stack area
-        // stackaddr < stackaddr + stacksize, so if stackaddr is not
-        // page-aligned, calculate the fix such that stackaddr <
-        // new_page_aligned_stackaddr < stackaddr + stacksize
-        let remainder = (stackaddr as usize) % psize;
-        if remainder != 0 {
-            stackaddr = ((stackaddr as usize) + psize - remainder)
-                as *mut libc::c_void;
-        }
-
-        // Rellocate the last page of the stack.
-        // This ensures SIGBUS will be raised on
-        // stack overflow.
-        let result = mmap(stackaddr,
-                          psize as libc::size_t,
-                          PROT_NONE,
-                          MAP_PRIVATE | MAP_ANON | MAP_FIXED,
-                          -1,
-                          0);
-
-        if result != stackaddr || result == MAP_FAILED {
-            panic!("failed to allocate a guard page");
-        }
-
-        let offset = if cfg!(target_os = "linux") {2} else {1};
-
-        GUARD_PAGE = stackaddr as usize + offset * psize;
-    }
-
-    pub unsafe fn main() -> usize {
-        GUARD_PAGE
-    }
-
-    #[cfg(target_os = "macos")]
-    pub unsafe fn current() -> usize {
-        extern {
-            fn pthread_get_stackaddr_np(thread: pthread_t) -> *mut libc::c_void;
-            fn pthread_get_stacksize_np(thread: pthread_t) -> libc::size_t;
-        }
-        (pthread_get_stackaddr_np(pthread_self()) as libc::size_t -
-         pthread_get_stacksize_np(pthread_self())) as usize
-    }
-
-    #[cfg(any(target_os = "openbsd", target_os = "bitrig"))]
-    pub unsafe fn current() -> usize {
-        #[repr(C)]
-        struct stack_t {
-            ss_sp: *mut libc::c_void,
-            ss_size: libc::size_t,
-            ss_flags: libc::c_int,
-        }
-        extern {
-            fn pthread_main_np() -> libc::c_uint;
-            fn pthread_stackseg_np(thread: pthread_t,
-                                   sinfo: *mut stack_t) -> libc::c_uint;
-        }
-
-        let mut current_stack: stack_t = mem::zeroed();
-        assert_eq!(pthread_stackseg_np(pthread_self(), &mut current_stack), 0);
-
-        let extra = if cfg!(target_os = "bitrig") {3} else {1} * os::page_size();
-        if pthread_main_np() == 1 {
-            // main thread
-            current_stack.ss_sp as usize - current_stack.ss_size as usize + extra
-        } else {
-            // new thread
-            current_stack.ss_sp as usize - current_stack.ss_size as usize
-        }
-    }
-
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    pub unsafe fn current() -> usize {
-        let mut attr: libc::pthread_attr_t = mem::zeroed();
-        assert_eq!(pthread_getattr_np(pthread_self(), &mut attr), 0);
-        let mut guardsize = 0;
-        assert_eq!(pthread_attr_getguardsize(&attr, &mut guardsize), 0);
-        if guardsize == 0 {
-            panic!("there is no guard page");
-        }
-        let mut stackaddr = ptr::null_mut();
-        let mut size = 0;
-        assert_eq!(pthread_attr_getstack(&attr, &mut stackaddr, &mut size), 0);
-        assert_eq!(pthread_attr_destroy(&mut attr), 0);
-
-        stackaddr as usize + guardsize as usize
-    }
-
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    extern {
-        fn pthread_getattr_np(native: libc::pthread_t,
-                              attr: *mut libc::pthread_attr_t) -> libc::c_int;
-        fn pthread_attr_getguardsize(attr: *const libc::pthread_attr_t,
-                                     guardsize: *mut libc::size_t) -> libc::c_int;
-        fn pthread_attr_getstack(attr: *const libc::pthread_attr_t,
-                                 stackaddr: *mut *mut libc::c_void,
-                                 stacksize: *mut libc::size_t) -> libc::c_int;
-    }
-}
 
 pub unsafe fn create(stack: usize, p: Thunk) -> io::Result<rust_thread> {
     let p = box p;
@@ -190,7 +32,7 @@ pub unsafe fn create(stack: usize, p: Thunk) -> io::Result<rust_thread> {
     assert_eq!(pthread_attr_init(&mut attr), 0);
 
     // Reserve room for the red zone, the runtime's stack of last resort.
-    let stack_size = cmp::max(stack, RED_ZONE + min_stack_size(&attr) as usize);
+    let stack_size = cmp::max(stack, stack::RED_ZONE + stack::min_stack_size(&attr) as usize);
     match pthread_attr_setstacksize(&mut attr, stack_size as libc::size_t) {
         0 => {}
         n => {
@@ -308,36 +150,6 @@ pub fn sleep(dur: Duration) {
     }
 }
 
-// glibc >= 2.15 has a __pthread_get_minstack() function that returns
-// PTHREAD_STACK_MIN plus however many bytes are needed for thread-local
-// storage.  We need that information to avoid blowing up when a small stack
-// is created in an application with big thread-local storage requirements.
-// See #6233 for rationale and details.
-//
-// Link weakly to the symbol for compatibility with older versions of glibc.
-// Assumes that we've been dynamically linked to libpthread but that is
-// currently always the case.  Note that you need to check that the symbol
-// is non-null before calling it!
-#[cfg(target_os = "linux")]
-fn min_stack_size(attr: *const libc::pthread_attr_t) -> libc::size_t {
-    type F = unsafe extern "C" fn(*const libc::pthread_attr_t) -> libc::size_t;
-    extern {
-        #[linkage = "extern_weak"]
-        static __pthread_get_minstack: *const ();
-    }
-    if __pthread_get_minstack.is_null() {
-        PTHREAD_STACK_MIN
-    } else {
-        unsafe { mem::transmute::<*const (), F>(__pthread_get_minstack)(attr) }
-    }
-}
-
-// __pthread_get_minstack() is marked as weak but extern_weak linkage is
-// not supported on OS X, hence this kludge...
-#[cfg(not(target_os = "linux"))]
-fn min_stack_size(_: *const libc::pthread_attr_t) -> libc::size_t {
-    PTHREAD_STACK_MIN
-}
 
 extern {
     fn pthread_self() -> libc::pthread_t;
@@ -351,8 +163,6 @@ extern {
     fn pthread_attr_destroy(attr: *mut libc::pthread_attr_t) -> libc::c_int;
     fn pthread_attr_setstacksize(attr: *mut libc::pthread_attr_t,
                                  stack_size: libc::size_t) -> libc::c_int;
-    fn pthread_attr_setdetachstate(attr: *mut libc::pthread_attr_t,
-                                   state: libc::c_int) -> libc::c_int;
     fn pthread_detach(thread: libc::pthread_t) -> libc::c_int;
     fn sched_yield() -> libc::c_int;
 }

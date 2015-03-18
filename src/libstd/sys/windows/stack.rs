@@ -7,31 +7,32 @@
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
-
 use rt::util::report_overflow;
 use core::prelude::*;
 use ptr;
 use mem;
 use libc;
 use libc::types::os::arch::extra::{LPVOID, DWORD, LONG, BOOL};
-use sys_common::stack;
 
-pub struct Handler {
-    _data: *mut libc::c_void
-}
-
-impl Handler {
-    pub unsafe fn new() -> Handler {
-        make_handler()
+/// Setup the stack information for a thread.
+///
+/// Must be called from the thread that is being set up. The earlier in the stack this function is
+/// called the better. Calling the function multiple times for the same thread is undefined.
+#[inline(always)]
+pub unsafe fn setup(_is_main: bool) {
+    if SetThreadStackGuarantee(&mut 0x1000) == 0 {
+        panic!("failed to reserve stack space for exception handling");
+    }
+    if AddVectoredExceptionHandler(0, vectored_handler) == ptr::null_mut() {
+        panic!("failed to install exception handler");
     }
 }
 
-impl Drop for Handler {
-    fn drop(&mut self) {}
+#[cfg(not(test))] // in testing, use the original libstd's version
+#[lang = "stack_exhausted"]
+extern fn stack_exhausted() {
+    // This function is not used in windows.
 }
-
-// This is initialized in init() and only read from after
-static mut PAGE_SIZE: uint = 0;
 
 #[no_stack_check]
 extern "system" fn vectored_handler(ExceptionInfo: *mut EXCEPTION_POINTERS) -> LONG {
@@ -43,37 +44,13 @@ extern "system" fn vectored_handler(ExceptionInfo: *mut EXCEPTION_POINTERS) -> L
             return EXCEPTION_CONTINUE_SEARCH;
         }
 
-        // We're calling into functions with stack checks,
-        // however stack checks by limit should be disabled on Windows
-        stack::record_sp_limit(0);
-
+        // We're calling into functions with stack checks, however:
+        // 1. We use stack probing and native stack overflow handling support on windows; and
+        // 2. Have reserved four whole kibibytes of stack space for stack overflow handling.
+        // Therefore, doing so should be A-OK.
         report_overflow();
-
         EXCEPTION_CONTINUE_SEARCH
     }
-}
-
-pub unsafe fn init() {
-    let mut info = mem::zeroed();
-    libc::GetSystemInfo(&mut info);
-    PAGE_SIZE = info.dwPageSize as uint;
-
-    if AddVectoredExceptionHandler(0, vectored_handler) == ptr::null_mut() {
-        panic!("failed to install exception handler");
-    }
-
-    mem::forget(make_handler());
-}
-
-pub unsafe fn cleanup() {
-}
-
-pub unsafe fn make_handler() -> Handler {
-    if SetThreadStackGuarantee(&mut 0x5000) == 0 {
-        panic!("failed to reserve stack space for exception handling");
-    }
-
-    Handler { _data: 0 as *mut libc::c_void }
 }
 
 pub struct EXCEPTION_RECORD {
@@ -90,8 +67,8 @@ pub struct EXCEPTION_POINTERS {
     pub ContextRecord: LPVOID
 }
 
-pub type PVECTORED_EXCEPTION_HANDLER = extern "system"
-        fn(ExceptionInfo: *mut EXCEPTION_POINTERS) -> LONG;
+pub type PVECTORED_EXCEPTION_HANDLER =
+    extern "system" fn(ExceptionInfo: *mut EXCEPTION_POINTERS) -> LONG;
 
 pub type ULONG = libc::c_ulong;
 

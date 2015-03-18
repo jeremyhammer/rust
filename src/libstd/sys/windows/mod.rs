@@ -41,7 +41,7 @@ pub mod pipe2;
 pub mod process;
 pub mod process2;
 pub mod rwlock;
-pub mod stack_overflow;
+pub mod stack;
 pub mod sync;
 pub mod tcp;
 pub mod thread;

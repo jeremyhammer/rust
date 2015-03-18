@@ -15,48 +15,16 @@ use core::prelude::*;
 use cell::RefCell;
 use string::String;
 use thread::Thread;
-use thread_local::State;
 
-struct ThreadInfo {
-    stack_guard: uint,
-    thread: Thread,
+thread_local! { static THREAD_INFO: RefCell<Option<Thread>> = RefCell::new(None) }
+
+pub fn current_thread() -> Option<Thread> {
+    THREAD_INFO.with(|cell| cell.borrow().clone())
 }
 
-thread_local! { static THREAD_INFO: RefCell<Option<ThreadInfo>> = RefCell::new(None) }
-
-impl ThreadInfo {
-    fn with<R, F>(f: F) -> R where F: FnOnce(&mut ThreadInfo) -> R {
-        if THREAD_INFO.state() == State::Destroyed {
-            panic!("Use of std::thread::current() is not possible after \
-                    the thread's local data has been destroyed");
-        }
-
-        THREAD_INFO.with(move |c| {
-            if c.borrow().is_none() {
-                *c.borrow_mut() = Some(ThreadInfo {
-                    stack_guard: 0,
-                    thread: NewThread::new(None),
-                })
-            }
-            f(c.borrow_mut().as_mut().unwrap())
-        })
-    }
-}
-
-pub fn current_thread() -> Thread {
-    ThreadInfo::with(|info| info.thread.clone())
-}
-
-pub fn stack_guard() -> uint {
-    ThreadInfo::with(|info| info.stack_guard)
-}
-
-pub fn set(stack_guard: uint, thread: Thread) {
+pub fn set(thread: Thread) {
     THREAD_INFO.with(|c| assert!(c.borrow().is_none()));
-    THREAD_INFO.with(move |c| *c.borrow_mut() = Some(ThreadInfo{
-        stack_guard: stack_guard,
-        thread: thread,
-    }));
+    THREAD_INFO.with(move |c| *c.borrow_mut() = Some(thread));
 }
 
 // a hack to get around privacy restrictions; implemented by `std::thread`
