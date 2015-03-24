@@ -212,7 +212,7 @@ pub mod types {
 
     // Standard types that are scalar but vary by OS and arch.
 
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "nacl"))]
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "nacl", target_os = "nosys"))]
     pub mod os {
         pub mod common {
             pub mod posix01 {
@@ -2742,7 +2742,7 @@ pub mod consts {
     }
 
 
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "nacl"))]
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "nacl", target_os = "nosys"))]
     pub mod os {
         pub mod c95 {
             use types::os::arch::c95::{c_int, c_uint};
@@ -5229,6 +5229,7 @@ pub mod funcs {
               target_os = "dragonfly",
               target_os = "bitrig",
               target_os = "openbsd",
+              target_os = "nosys",
               target_os = "nacl"))]
     pub mod posix88 {
         pub mod stat_ {
@@ -5650,7 +5651,7 @@ pub mod funcs {
         }
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "nosys"))]
     pub mod posix01 {
         pub mod stat_ {
         }
@@ -5678,6 +5679,7 @@ pub mod funcs {
               target_os = "dragonfly",
               target_os = "bitrig",
               target_os = "openbsd",
+              target_os = "nosys",
               target_os = "nacl"))]
     pub mod posix08 {
         pub mod unistd {
@@ -5824,7 +5826,7 @@ pub mod funcs {
         }
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "nosys"))]
     pub mod bsd44 {
     }
 
@@ -5845,7 +5847,7 @@ pub mod funcs {
     pub mod extra {
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android", target_os = "nacl"))]
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "nacl", target_os = "nosys"))]
     pub mod extra {
     }
 

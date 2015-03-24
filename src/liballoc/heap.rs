@@ -262,7 +262,7 @@ mod imp {
 #[cfg(all(not(feature = "external_funcs"),
           not(feature = "external_crate"),
           not(jemalloc),
-          unix))]
+          not(windows)))]
 mod imp {
     use core::cmp;
     use core::ptr;

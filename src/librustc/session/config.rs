@@ -619,9 +619,14 @@ pub fn default_configuration(sess: &Session) -> ast::CrateConfig {
     let wordsz = &sess.target.target.target_pointer_width;
     let os = &sess.target.target.target_os;
 
-    let fam = match sess.target.target.options.is_like_windows {
-        true  => InternedString::new("windows"),
-        false => InternedString::new("unix")
+    let fam = match &os[..] {
+        "nosys" => InternedString::new("nosys"),
+        _ => {
+            match sess.target.target.options.is_like_windows {
+                true  => InternedString::new("windows"),
+                false => InternedString::new("unix")
+            }
+        }
     };
 
     let mk = attr::mk_name_value_item_str;

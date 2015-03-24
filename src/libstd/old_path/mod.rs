@@ -85,48 +85,48 @@ pub use self::posix::Path as PosixPath;
 pub use self::windows::Path as WindowsPath;
 
 /// Typedef for the platform-native path type
-#[cfg(unix)]
+#[cfg(any(unix,nosys))]
 pub use self::posix::Path as Path;
 /// Typedef for the platform-native path type
 #[cfg(windows)]
 pub use self::windows::Path as Path;
 
 /// Typedef for the platform-native component iterator
-#[cfg(unix)]
+#[cfg(any(unix,nosys))]
 pub use self::posix::Components as Components;
 /// Typedef for the platform-native component iterator
 #[cfg(windows)]
 pub use self::windows::Components as Components;
 
 /// Typedef for the platform-native str component iterator
-#[cfg(unix)]
+#[cfg(any(unix,nosys))]
 pub use self::posix::StrComponents as StrComponents;
 /// Typedef for the platform-native str component iterator
 #[cfg(windows)]
 pub use self::windows::StrComponents as StrComponents;
 
 /// Alias for the platform-native separator character.
-#[cfg(unix)]
+#[cfg(any(unix,nosys))]
 pub use self::posix::SEP as SEP;
 /// Alias for the platform-native separator character.
 #[cfg(windows)]
 pub use self::windows::SEP as SEP;
 
 /// Alias for the platform-native separator byte.
-#[cfg(unix)]
+#[cfg(any(unix,nosys))]
 pub use self::posix::SEP_BYTE as SEP_BYTE;
 /// Alias for the platform-native separator byte.
 #[cfg(windows)]
 pub use self::windows::SEP_BYTE as SEP_BYTE;
 
 /// Typedef for the platform-native separator char func
-#[cfg(unix)]
+#[cfg(any(unix,nosys))]
 pub use self::posix::is_sep as is_sep;
 /// Typedef for the platform-native separator char func
 #[cfg(windows)]
 pub use self::windows::is_sep as is_sep;
 /// Typedef for the platform-native separator byte func
-#[cfg(unix)]
+#[cfg(any(unix,nosys))]
 pub use self::posix::is_sep_byte as is_sep_byte;
 /// Typedef for the platform-native separator byte func
 #[cfg(windows)]
@@ -146,7 +146,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let path = Path::new("foo/bar");
     /// # }
     /// ```
@@ -171,7 +171,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let x: &[u8] = b"foo\0";
     /// assert!(Path::new_opt(x).is_none());
     /// # }
@@ -194,7 +194,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("/abc/def");
     /// assert_eq!(p.as_str(), Some("/abc/def"));
     /// # }
@@ -212,7 +212,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("abc/def");
     /// assert_eq!(p.as_vec(), b"abc/def");
     /// # }
@@ -227,7 +227,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("abc/def");
     /// assert_eq!(p.into_vec(), b"abc/def".to_vec());
     /// // attempting to use p now results in "error: use of moved value"
@@ -243,7 +243,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("abc/def");
     /// println!("{}", p.display()); // prints "abc/def"
     /// # }
@@ -262,7 +262,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("abc/def");
     /// println!("{}", p.filename_display()); // prints "def"
     /// # }
@@ -280,7 +280,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("abc/def/ghi");
     /// assert_eq!(p.dirname(), b"abc/def");
     /// # }
@@ -296,7 +296,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("abc/def/ghi");
     /// assert_eq!(p.dirname_str(), Some("abc/def"));
     /// # }
@@ -316,7 +316,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("abc/def/ghi");
     /// assert_eq!(p.filename(), Some(&b"ghi"[..]));
     /// # }
@@ -332,7 +332,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("abc/def/ghi");
     /// assert_eq!(p.filename_str(), Some("ghi"));
     /// # }
@@ -352,7 +352,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("/abc/def.txt");
     /// assert_eq!(p.filestem(), Some(&b"def"[..]));
     /// # }
@@ -380,7 +380,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("/abc/def.txt");
     /// assert_eq!(p.filestem_str(), Some("def"));
     /// # }
@@ -401,7 +401,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("abc/def.txt");
     /// assert_eq!(p.extension(), Some(&b"txt"[..]));
     /// # }
@@ -429,7 +429,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("abc/def.txt");
     /// assert_eq!(p.extension_str(), Some("txt"));
     /// # }
@@ -448,7 +448,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let mut p = Path::new("abc/def.txt");
     /// p.set_filename("foo.dat");
     /// assert!(p == Path::new("abc/foo.dat"));
@@ -475,7 +475,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let mut p = Path::new("abc/def.txt");
     /// p.set_extension("csv");
     /// assert_eq!(p, Path::new("abc/def.csv"));
@@ -526,7 +526,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let mut p = Path::new("abc/def.txt");
     /// assert_eq!(p.with_filename("foo.dat"), Path::new("abc/foo.dat"));
     /// # }
@@ -552,7 +552,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let mut p = Path::new("abc/def.txt");
     /// assert_eq!(p.with_extension("csv"), Path::new("abc/def.csv"));
     /// # }
@@ -577,7 +577,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("abc/def/ghi");
     /// assert_eq!(p.dir_path(), Path::new("abc/def"));
     /// # }
@@ -597,7 +597,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// assert_eq!(Path::new("abc/def").root_path(), None);
     /// assert_eq!(Path::new("/abc/def").root_path(), Some(Path::new("/")));
     /// # }
@@ -613,7 +613,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let mut p = Path::new("foo/bar");
     /// p.push("baz.txt");
     /// assert_eq!(p, Path::new("foo/bar/baz.txt"));
@@ -638,7 +638,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let mut p = Path::new("foo");
     /// p.push_many(&["bar", "baz.txt"]);
     /// assert_eq!(p, Path::new("foo/bar/baz.txt"));
@@ -668,7 +668,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let mut p = Path::new("foo/bar/baz.txt");
     /// p.pop();
     /// assert_eq!(p, Path::new("foo/bar"));
@@ -686,7 +686,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("/foo");
     /// assert_eq!(p.join("bar.txt"), Path::new("/foo/bar.txt"));
     /// # }
@@ -712,7 +712,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("foo");
     /// let fbbq = Path::new("foo/bar/baz/quux.txt");
     /// assert_eq!(p.join_many(&["bar", "baz", "quux.txt"]), fbbq);
@@ -735,7 +735,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("/abc/def");
     /// assert!(p.is_absolute());
     /// # }
@@ -753,7 +753,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("abc/def");
     /// assert!(p.is_relative());
     /// # }
@@ -772,7 +772,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("foo/bar/baz/quux.txt");
     /// let fb = Path::new("foo/bar");
     /// let bq = Path::new("baz/quux.txt");
@@ -792,7 +792,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("foo/bar/baz/quux.txt");
     /// let fb = Path::new("foo/bar");
     /// let bq = Path::new("baz/quux.txt");
@@ -809,7 +809,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// use std::old_path::{Path, GenericPath};
     /// # foo();
     /// # #[cfg(windows)] fn foo() {}
-    /// # #[cfg(unix)] fn foo() {
+    /// # #[cfg(any(unix,nosys))] fn foo() {
     /// let p = Path::new("foo/bar/baz/quux.txt");
     /// let bq = Path::new("baz/quux.txt");
     /// assert!(p.ends_with_path(&bq));

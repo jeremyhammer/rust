@@ -13,7 +13,7 @@
 
 pub use self::imp::OsRng;
 
-#[cfg(all(unix, not(target_os = "ios")))]
+#[cfg(any(nosys, all(unix, not(target_os = "ios"))))]
 mod imp {
     extern crate libc;
 

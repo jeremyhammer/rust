@@ -281,6 +281,8 @@ pub mod sync;
 #[path = "sys/unix/mod.rs"] mod sys;
 #[cfg(windows)]
 #[path = "sys/windows/mod.rs"] mod sys;
+#[cfg(nosys)]
+#[path = "sys/nosys/mod.rs"] mod sys;
 
 pub mod rt;
 mod panicking;
